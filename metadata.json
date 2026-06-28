@@ -1,0 +1,6 @@
+{
+  "name": "TERP - Threat Emulation & Research Platform",
+  "description": "Advanced adversarial simulation platform for red team training, featuring real-time sentiment-aware TTS, OSINT research modules, and automated threat script generation.",
+  "requestFramePermissions": ["microphone"],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
