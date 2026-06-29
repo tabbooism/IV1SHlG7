@@ -11,16 +11,11 @@ export function useIsMobile() {
       setIsMobile(window.innerWidth < MOBILE_BREAKPOINT)
     }
     mql.addEventListener("change", onChange)
-    
-    // Use a small delay or check after mount to avoid sync state update in effect
-    const initialCheck = setTimeout(() => {
-      setIsMobile(window.innerWidth < MOBILE_BREAKPOINT)
-    }, 0)
-    
-    return () => {
-      mql.removeEventListener("change", onChange)
-      clearTimeout(initialCheck)
+    const initialValue = window.innerWidth < MOBILE_BREAKPOINT
+    if (isMobile !== initialValue) {
+      setIsMobile(initialValue)
     }
+    return () => mql.removeEventListener("change", onChange)
   }, [])
 
   return !!isMobile

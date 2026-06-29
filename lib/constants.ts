@@ -68,3 +68,9 @@ export const OSINT_TRENDS = [
   { id: 't2', topic: 'AI Vishing', trend: 'Real-time emotion mirroring in deepfake audio', impact: 'Extreme' },
   { id: 't3', topic: 'Supply Chain', trend: 'Targeting open-source dependency maintainers', impact: 'Critical' },
 ];
+
+export const SIMULATED_STAGERS = [
+  { id: 'st-1', name: 'LEETSEEK_CORE_v1', type: 'Initial Access', status: 'Gated' },
+  { id: 'st-2', name: 'POLY_LOADER_ALPHA', type: 'Persistence', status: 'Gated' },
+  { id: 'st-3', name: 'STAGED_DROpper_X', type: 'Payload Delivery', status: 'Gated' },
+];

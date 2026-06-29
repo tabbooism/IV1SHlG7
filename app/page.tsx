@@ -30,7 +30,7 @@ import {
   Clock
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { ADVANCED_PERSONAS, INDUSTRY_TEMPLATES, SENSITIVE_AGENTS, OSINT_TRENDS } from '@/lib/constants';
+import { ADVANCED_PERSONAS, INDUSTRY_TEMPLATES, SENSITIVE_AGENTS, OSINT_TRENDS, SIMULATED_STAGERS } from '@/lib/constants';
 import { initAuth, googleSignIn, logout, getAccessToken } from '@/lib/auth';
 import { DriveFile, listDriveFiles, searchDriveFiles } from '@/lib/google-drive';
 import { User } from 'firebase/auth';
@@ -42,6 +42,7 @@ export default function TerpDashboard() {
   const [script, setScript] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [exerciseId, setExerciseId] = useState('');
+  const [audioUrl, setAudioUrl] = useState<string | null>(null);
   const [selectedPersona, setSelectedPersona] = useState(ADVANCED_PERSONAS[0]);
   const [activeTab, setActiveTab] = useState<'vishing' | 'smishing' | 'research' | 'drive' | 'logs'>('vishing');
   const [smishingHistory, setSmishingHistory] = useState<{role: 'attacker' | 'target', text: string}[]>([]);
@@ -62,7 +63,20 @@ export default function TerpDashboard() {
   const chunksRef = useRef<Blob[]>([]);
 
   useEffect(() => {
-    setExerciseId(`TRAIN-${Math.floor(1000 + Math.random() * 9000)}`);
+    // Load from LocalStorage
+    const savedExerciseId = localStorage.getItem('exerciseId');
+    const savedSmishingHistory = localStorage.getItem('smishingHistory');
+    
+    if (savedExerciseId) setExerciseId(savedExerciseId);
+    else setExerciseId(`TRAIN-${Math.floor(1000 + Math.random() * 9000)}`);
+
+    if (savedSmishingHistory) {
+      try {
+        setSmishingHistory(JSON.parse(savedSmishingHistory));
+      } catch (e) {
+        console.error("Failed to load history", e);
+      }
+    }
     
     // Initialize Auth
     const unsubscribe = initAuth(
@@ -78,6 +92,12 @@ export default function TerpDashboard() {
 
     return () => unsubscribe();
   }, []);
+
+  useEffect(() => {
+    // Auto-save session
+    if (exerciseId) localStorage.setItem('exerciseId', exerciseId);
+    localStorage.setItem('smishingHistory', JSON.stringify(smishingHistory));
+  }, [exerciseId, smishingHistory]);
 
   const handleLogin = async () => {
     try {
@@ -182,6 +202,7 @@ export default function TerpDashboard() {
       mediaRecorder.onstop = () => {
         const blob = new Blob(chunksRef.current, { type: 'audio/webm' });
         setAudioBlob(blob);
+        setAudioUrl(URL.createObjectURL(blob));
         analyzeSentiment(blob);
       };
 
@@ -190,6 +211,36 @@ export default function TerpDashboard() {
     } catch (err) {
       console.error("Recording error:", err);
     }
+  };
+
+  const exportAudio = () => {
+    if (!audioBlob) return;
+    const url = URL.createObjectURL(audioBlob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `TERP_RECORDING_${exerciseId}_${Date.now()}.webm`;
+    a.click();
+  };
+
+  const handleScriptImport = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      const content = event.target?.result as string;
+      if (file.name.endsWith('.json')) {
+        try {
+          const json = JSON.parse(content);
+          setScript(json.script || json.scenario || content);
+        } catch (err) {
+          console.error("Failed to parse JSON script", err);
+        }
+      } else {
+        setScript(content);
+      }
+    };
+    reader.readAsText(file);
   };
 
   const stopRecording = () => {
@@ -456,7 +507,7 @@ export default function TerpDashboard() {
                     {[...Array(40)].map((_, i) => (
                       <motion.div
                         key={i}
-                        animate={{ height: [`10%`, `${20 + Math.random() * 80}%`, `10%`][i % 3] }}
+                        animate={{ height: [`10%`, `${20 + (i * 1.5) % 80}%`, `10%`][i % 3] }}
                         transition={{ repeat: Infinity, duration: 0.4, delay: i * 0.02 }}
                         className="flex-1 bg-primary rounded-t-full"
                       />
@@ -472,9 +523,26 @@ export default function TerpDashboard() {
                     <h3 className="text-xs font-mono text-neutral-500 uppercase flex items-center gap-2">
                       <Terminal className="w-4 h-4 text-primary" /> ADVERSARY_PAYLOAD
                     </h3>
-                    <button className="text-[9px] font-mono text-neutral-600 hover:text-primary transition-colors flex items-center gap-1">
-                      <Send className="w-3 h-3" /> EXPORT
-                    </button>
+                    <div className="flex items-center gap-2">
+                      <label className="cursor-pointer text-[9px] font-mono text-neutral-600 hover:text-primary transition-colors flex items-center gap-1">
+                        <FolderOpen className="w-3 h-3" /> IMPORT_OPS
+                        <input type="file" accept=".txt,.json" className="hidden" onChange={handleScriptImport} />
+                      </label>
+                      <button 
+                        onClick={() => {
+                          if (!script) return;
+                          const blob = new Blob([script], { type: 'text/plain' });
+                          const url = URL.createObjectURL(blob);
+                          const a = document.createElement('a');
+                          a.href = url;
+                          a.download = `TERP_SCRIPT_${exerciseId}.txt`;
+                          a.click();
+                        }}
+                        className="text-[9px] font-mono text-neutral-600 hover:text-primary transition-colors flex items-center gap-1"
+                      >
+                        <Send className="w-3 h-3" /> EXPORT
+                      </button>
+                    </div>
                   </div>
                   <div className="bg-neutral-950 p-5 rounded-xl border border-neutral-900 h-[220px] overflow-auto custom-scrollbar font-mono text-[11px] leading-relaxed shadow-inner">
                     {script ? (
@@ -538,6 +606,16 @@ export default function TerpDashboard() {
                 <h3 className="text-sm font-display font-bold flex items-center gap-2 text-neutral-200">
                   <BarChart3 className="w-4 h-4 text-primary" /> ANALYTICS_ENGINE
                 </h3>
+
+                {audioUrl && (
+                  <div className="space-y-3">
+                    <div className="flex justify-between items-center px-1">
+                      <span className="text-[10px] font-mono text-neutral-500 uppercase">Playback</span>
+                      <button onClick={exportAudio} className="text-[9px] font-mono text-primary hover:underline">EXPORT_WAV</button>
+                    </div>
+                    <audio src={audioUrl} controls className="w-full h-8 filter invert hue-rotate-180 opacity-70" />
+                  </div>
+                )}
                 
                 {analysis ? (
                   <div className="space-y-8">
@@ -568,7 +646,7 @@ export default function TerpDashboard() {
 
                     <div className="bg-primary/5 p-4 rounded-xl border border-primary/20">
                       <div className="text-[8px] font-mono text-primary/60 mb-2 uppercase tracking-[0.2em] font-bold">Recommended Voice Tone</div>
-                      <div className="text-xs font-mono text-primary italic font-bold">"{analysis.tts_parameters?.tone || 'Neutral'}"</div>
+                      <div className="text-xs font-mono text-primary italic font-bold">&quot;{analysis.tts_parameters?.tone || 'Neutral'}&quot;</div>
                     </div>
                   </div>
                 ) : (
@@ -771,6 +849,23 @@ export default function TerpDashboard() {
                       <button className="bg-neutral-900 p-2 rounded text-[10px] font-mono text-neutral-500 border border-neutral-800 hover:border-primary/40 transition-colors">IP_CORRELATOR</button>
                       <button className="bg-neutral-900 p-2 rounded text-[10px] font-mono text-neutral-500 border border-neutral-800 hover:border-primary/40 transition-colors">HASH_DB</button>
                       <button className="bg-neutral-900 p-2 rounded text-[10px] font-mono text-neutral-500 border border-neutral-800 hover:border-primary/40 transition-colors">LEAK_WATCH</button>
+                    </div>
+                  </div>
+
+                  <div className="p-4 bg-neutral-950 rounded-xl border border-neutral-900 space-y-4">
+                    <h4 className="text-[10px] font-mono text-neutral-500 uppercase tracking-widest flex items-center gap-2">
+                      <Layers className="w-3 h-3 text-primary" /> ADVERSARY_BLUEPRINTS
+                    </h4>
+                    <div className="grid grid-cols-1 gap-1.5">
+                      {SIMULATED_STAGERS.map((stager) => (
+                        <div key={stager.id} className="flex items-center justify-between p-2.5 bg-neutral-900 rounded-lg border border-neutral-800 group hover:border-primary/30 transition-all">
+                          <div className="flex flex-col">
+                            <span className="text-[10px] font-bold text-neutral-400 group-hover:text-primary transition-colors">{stager.name}</span>
+                            <span className="text-[8px] text-neutral-700 font-mono">{stager.type}</span>
+                          </div>
+                          <span className="text-[8px] px-1.5 py-0.5 bg-neutral-800 text-neutral-600 rounded border border-neutral-700 font-mono">{stager.status}</span>
+                        </div>
+                      ))}
                     </div>
                   </div>
                 </div>
@@ -1105,7 +1200,7 @@ export default function TerpDashboard() {
                 <div key={i} className="flex gap-4 opacity-40">
                   <span className="text-neutral-600 shrink-0">[{new Date().toISOString()}]</span>
                   <span className="text-neutral-500">NULL_POINTER_SAFEGUARD:</span>
-                  <span className="text-neutral-700">STABILIZING_MEMORY_BLOCK_0x{Math.floor(Math.random() * 10000).toString(16)}</span>
+                  <span className="text-neutral-700">STABILIZING_MEMORY_BLOCK_0x{(i * 1234).toString(16)}</span>
                 </div>
               ))}
               <div className="text-primary animate-pulse ml-4 font-bold tracking-widest text-lg">_</div>
