@@ -30,7 +30,7 @@ import {
   Clock
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { ADVANCED_PERSONAS, INDUSTRY_TEMPLATES, SENSITIVE_AGENTS, OSINT_TRENDS, SIMULATED_STAGERS } from '@/lib/constants';
+import { ADVANCED_PERSONAS, INDUSTRY_TEMPLATES, SENSITIVE_AGENTS, OSINT_TRENDS, SIMULATED_STAGERS, APT_GROUPS } from '@/lib/constants';
 import { initAuth, googleSignIn, logout, getAccessToken } from '@/lib/auth';
 import { DriveFile, listDriveFiles, searchDriveFiles } from '@/lib/google-drive';
 import { User } from 'firebase/auth';
@@ -44,7 +44,7 @@ export default function TerpDashboard() {
   const [exerciseId, setExerciseId] = useState('');
   const [audioUrl, setAudioUrl] = useState<string | null>(null);
   const [selectedPersona, setSelectedPersona] = useState(ADVANCED_PERSONAS[0]);
-  const [activeTab, setActiveTab] = useState<'vishing' | 'smishing' | 'research' | 'drive' | 'logs'>('vishing');
+  const [activeTab, setActiveTab] = useState<'vishing' | 'smishing' | 'research' | 'drive' | 'payloads' | 'logs'>('vishing');
   const [smishingHistory, setSmishingHistory] = useState<{role: 'attacker' | 'target', text: string}[]>([]);
   const [smishingInput, setSmishingInput] = useState('');
   
@@ -58,6 +58,13 @@ export default function TerpDashboard() {
   const [isAnalyzingDoc, setIsAnalyzingDoc] = useState(false);
   const [researchReport, setResearchReport] = useState<string | null>(null);
   const [isResearching, setIsResearching] = useState(false);
+  const [backgroundNoise, setBackgroundNoise] = useState<'none' | 'airport' | 'office' | 'static'>('none');
+  const [smishingMode, setSmishingMode] = useState<'sms' | 'rcs'>('sms');
+  const [isGeneratingPayload, setIsGeneratingPayload] = useState(false);
+  const [obfuscationLevel, setObfuscationLevel] = useState(1);
+  const [showMitreMatrix, setShowMitreMatrix] = useState(false);
+  const [activeResearchSubTab, setActiveResearchSubTab] = useState<'trends' | 'apt' | 'matrix'>('trends');
+  const [showLurePreview, setShowLurePreview] = useState(false);
   
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const chunksRef = useRef<Blob[]>([]);
@@ -335,7 +342,7 @@ export default function TerpDashboard() {
           
           <div className="flex flex-wrap items-center gap-4">
             <nav className="flex bg-neutral-900 p-1 rounded-xl border border-neutral-800 shadow-lg">
-              {(['vishing', 'smishing', 'research', 'drive', 'logs'] as const).map((tab) => (
+              {(['vishing', 'smishing', 'research', 'drive', 'payloads', 'logs'] as const).map((tab) => (
                 <button
                   key={tab}
                   onClick={() => setActiveTab(tab)}
@@ -413,6 +420,28 @@ export default function TerpDashboard() {
                       )}
                     </button>
                   ))}
+                </div>
+
+                <div className="space-y-4 pt-4 border-t border-neutral-900">
+                  <h4 className="text-[10px] font-mono text-neutral-500 uppercase tracking-widest flex items-center gap-2">
+                    <Zap className="w-3 h-3 text-primary" /> BACKGROUND_SIM
+                  </h4>
+                  <div className="grid grid-cols-2 gap-2">
+                    {(['none', 'airport', 'office', 'static'] as const).map((noise) => (
+                      <button
+                        key={noise}
+                        onClick={() => setBackgroundNoise(noise)}
+                        className={cn(
+                          "px-2 py-1.5 rounded border font-mono text-[9px] uppercase transition-all",
+                          backgroundNoise === noise 
+                            ? "bg-primary/10 border-primary/40 text-primary" 
+                            : "bg-neutral-900 border-neutral-800 text-neutral-600 hover:text-neutral-400"
+                        )}
+                      >
+                        {noise}
+                      </button>
+                    ))}
+                  </div>
                 </div>
               </section>
 
@@ -681,6 +710,21 @@ export default function TerpDashboard() {
                   <Smartphone className="w-6 h-6 text-primary" /> SMiShing Emulator
                 </h2>
                 <div className="space-y-4">
+                  <div className="flex bg-neutral-950 p-1 rounded-xl border border-neutral-900">
+                    <button 
+                      onClick={() => setSmishingMode('sms')}
+                      className={cn("flex-1 py-1.5 rounded-lg text-[10px] font-mono transition-all", smishingMode === 'sms' ? "bg-neutral-800 text-white" : "text-neutral-500")}
+                    >
+                      SMS_MODE
+                    </button>
+                    <button 
+                      onClick={() => setSmishingMode('rcs')}
+                      className={cn("flex-1 py-1.5 rounded-lg text-[10px] font-mono transition-all", smishingMode === 'rcs' ? "bg-primary text-white" : "text-neutral-500")}
+                    >
+                      RCS_VERIFIED
+                    </button>
+                  </div>
+
                   <div className="bg-neutral-950 p-4 rounded-xl border border-neutral-900">
                     <label className="text-[10px] font-mono text-neutral-500 uppercase block mb-2">Campaign Target</label>
                     <div className="flex gap-2">
@@ -739,6 +783,12 @@ export default function TerpDashboard() {
                 {/* Status Bar */}
                 <div className="h-12 bg-neutral-900 flex justify-between items-center px-8 text-[10px] text-white/80 font-medium">
                   <span>9:41</span>
+                  {smishingMode === 'rcs' && (
+                    <div className="flex items-center gap-1">
+                      <div className="w-1.5 h-1.5 bg-blue-500 rounded-full" />
+                      <span className="text-[8px] text-blue-500 font-bold uppercase tracking-tighter">RCS_Verified</span>
+                    </div>
+                  )}
                   <div className="flex items-center gap-1.5">
                     <Activity size={10} />
                     <Zap size={10} />
@@ -756,6 +806,26 @@ export default function TerpDashboard() {
                   <AnimatePresence mode="popLayout">
                     {smishingHistory.length === 0 ? (
                       <div className="h-full flex flex-col items-center justify-center text-center px-8 text-neutral-800 italic text-xs gap-3">
+                        {smishingMode === 'rcs' && (
+                          <motion.div 
+                            initial={{ scale: 0.9, opacity: 0 }}
+                            animate={{ scale: 1, opacity: 1 }}
+                            className="bg-neutral-900 p-4 rounded-2xl border border-neutral-800 mb-4 w-full"
+                          >
+                            <div className="flex items-center gap-3 mb-3">
+                              <div className="w-10 h-10 rounded-full bg-white flex items-center justify-center overflow-hidden border border-neutral-700">
+                                <img src="https://www.gstatic.com/images/branding/product/2x/googleg_96dp.png" alt="Brand" className="w-6 h-6" />
+                              </div>
+                              <div className="text-left">
+                                <div className="text-[10px] font-bold text-white">Google Security</div>
+                                <div className="text-[8px] text-neutral-500">Verified Business</div>
+                              </div>
+                            </div>
+                            <div className="text-[10px] text-neutral-400 text-left leading-relaxed">
+                              "Critical security alert for your account. Please verify your identity."
+                            </div>
+                          </motion.div>
+                        )}
                         <MessageSquare className="w-12 h-12 opacity-10" />
                         Enter an initial lure to begin simulation.
                       </div>
@@ -876,9 +946,25 @@ export default function TerpDashboard() {
             <div className="lg:col-span-8">
               <section className="terminal-card rounded-2xl min-h-[600px] flex flex-col relative overflow-hidden shadow-2xl">
                 <div className="p-6 border-b border-neutral-900 bg-neutral-900/20 flex justify-between items-center">
-                  <div className="flex items-center gap-3">
-                    <Terminal size={18} className="text-primary" />
-                    <span className="font-mono text-xs text-neutral-400">RESEARCH_TERMINAL::v2.4_STABLE</span>
+                  <div className="flex items-center gap-6">
+                    <div className="flex items-center gap-2">
+                      <Terminal size={18} className="text-primary" />
+                      <span className="font-mono text-xs text-neutral-400">RESEARCH_CORE_v2.4</span>
+                    </div>
+                    <div className="flex gap-1 bg-neutral-950 p-1 rounded-lg border border-neutral-900">
+                      {(['trends', 'apt', 'matrix'] as const).map((sub) => (
+                        <button
+                          key={sub}
+                          onClick={() => setActiveResearchSubTab(sub)}
+                          className={cn(
+                            "px-3 py-1 rounded text-[9px] font-mono uppercase transition-all",
+                            activeResearchSubTab === sub ? "bg-primary text-white" : "text-neutral-500 hover:text-neutral-300"
+                          )}
+                        >
+                          {sub}
+                        </button>
+                      ))}
+                    </div>
                   </div>
                   <div className="flex gap-2">
                     <div className="w-2.5 h-2.5 rounded-full bg-red-500/20" />
@@ -888,78 +974,134 @@ export default function TerpDashboard() {
                 </div>
 
                 <div className="flex-1 p-8 overflow-auto custom-scrollbar">
-                  {!researchReport && !isResearching ? (
-                    <div className="h-full flex flex-col items-center justify-center text-center gap-8">
-                      <div className="relative">
-                        <motion.div 
-                          animate={{ 
-                            scale: [1, 1.05, 1],
-                            rotate: [0, 5, -5, 0]
-                          }}
-                          transition={{ duration: 4, repeat: Infinity }}
-                          className="w-32 h-32 bg-primary/5 rounded-full border border-primary/20 flex items-center justify-center"
-                        >
-                          <Cpu size={48} className="text-primary/40" />
-                        </motion.div>
-                        <div className="absolute inset-0 bg-primary/10 blur-3xl opacity-20" />
-                      </div>
-                      
-                      <div className="space-y-3">
-                        <h3 className="text-2xl font-display font-bold text-neutral-200 uppercase tracking-tighter">Adversarial Trend Engine</h3>
-                        <p className="text-sm text-neutral-500 max-w-md mx-auto leading-relaxed">
-                          Synthesize modern threat vectors and cultural dynamics to forecast 2026-2027 adversarial evolutions.
-                        </p>
-                      </div>
-
-                      <div className="flex flex-wrap justify-center gap-4 mt-4">
-                        <button 
-                          onClick={() => handleResearch()}
-                          className="px-8 py-3 bg-primary text-white rounded-xl font-mono text-xs font-bold hover:scale-105 transition-transform shadow-lg shadow-primary/20 flex items-center gap-2"
-                        >
-                          <Zap size={14} /> GENERATE_SYNTHESIS
-                        </button>
-                        <button className="px-8 py-3 bg-neutral-800 text-neutral-300 rounded-xl font-mono text-xs font-bold hover:bg-neutral-700 transition-colors border border-neutral-700">
-                          API_CONFIGURATION
-                        </button>
-                      </div>
-                    </div>
-                  ) : (
-                    <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-700">
-                      <div className="flex items-center justify-between border-b border-neutral-900 pb-4">
-                        <h4 className="text-xs font-mono text-primary font-bold uppercase tracking-[0.2em]">INTEL_SYNTHESIS_REPORT</h4>
-                        <button 
-                          onClick={() => setResearchReport(null)}
-                          className="text-[10px] font-mono text-neutral-600 hover:text-white"
-                        >
-                          RESET_CORE
-                        </button>
-                      </div>
-
-                      {isResearching ? (
-                        <div className="py-20 flex flex-col items-center gap-6">
+                  {activeResearchSubTab === 'trends' ? (
+                    <>
+                      {!researchReport && !isResearching ? (
+                        <div className="h-full flex flex-col items-center justify-center text-center gap-8">
                           <div className="relative">
-                            <RefreshCw className="w-12 h-12 text-primary animate-spin" />
-                            <div className="absolute inset-0 bg-primary/20 blur-2xl animate-pulse" />
+                            <motion.div 
+                              animate={{ 
+                                scale: [1, 1.05, 1],
+                                rotate: [0, 5, -5, 0]
+                              }}
+                              transition={{ duration: 4, repeat: Infinity }}
+                              className="w-32 h-32 bg-primary/5 rounded-full border border-primary/20 flex items-center justify-center"
+                            >
+                              <Cpu size={48} className="text-primary/40" />
+                            </motion.div>
+                            <div className="absolute inset-0 bg-primary/10 blur-3xl opacity-20" />
                           </div>
-                          <div className="flex flex-col items-center gap-2">
-                            <span className="text-[10px] font-mono text-neutral-500 uppercase tracking-widest">Correlating modern vectors...</span>
-                            <div className="flex gap-1">
-                              {[...Array(3)].map((_, i) => (
-                                <motion.div 
-                                  key={i}
-                                  animate={{ opacity: [0.2, 1, 0.2] }}
-                                  transition={{ duration: 1, repeat: Infinity, delay: i * 0.2 }}
-                                  className="w-1.5 h-1.5 bg-primary rounded-full" 
-                                />
-                              ))}
-                            </div>
+                          
+                          <div className="space-y-3">
+                            <h3 className="text-2xl font-display font-bold text-neutral-200 uppercase tracking-tighter">Adversarial Trend Engine</h3>
+                            <p className="text-sm text-neutral-500 max-w-md mx-auto leading-relaxed">
+                              Synthesize modern threat vectors and cultural dynamics to forecast 2026-2027 adversarial evolutions.
+                            </p>
+                          </div>
+
+                          <div className="flex flex-wrap justify-center gap-4 mt-4">
+                            <button 
+                              onClick={() => handleResearch()}
+                              className="px-8 py-3 bg-primary text-white rounded-xl font-mono text-xs font-bold hover:scale-105 transition-transform shadow-lg shadow-primary/20 flex items-center gap-2"
+                            >
+                              <Zap size={14} /> GENERATE_SYNTHESIS
+                            </button>
+                            <button className="px-8 py-3 bg-neutral-800 text-neutral-300 rounded-xl font-mono text-xs font-bold hover:bg-neutral-700 transition-colors border border-neutral-700">
+                              API_CONFIGURATION
+                            </button>
                           </div>
                         </div>
                       ) : (
-                        <div className="font-mono text-xs leading-relaxed text-neutral-400 whitespace-pre-wrap bg-neutral-950/50 p-8 rounded-2xl border border-neutral-900 shadow-inner">
-                          {researchReport}
+                        <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-700">
+                          <div className="flex items-center justify-between border-b border-neutral-900 pb-4">
+                            <h4 className="text-xs font-mono text-primary font-bold uppercase tracking-[0.2em]">INTEL_SYNTHESIS_REPORT</h4>
+                            <button 
+                              onClick={() => setResearchReport(null)}
+                              className="text-[10px] font-mono text-neutral-600 hover:text-white"
+                            >
+                              RESET_CORE
+                            </button>
+                          </div>
+
+                          {isResearching ? (
+                            <div className="py-20 flex flex-col items-center gap-6">
+                              <div className="relative">
+                                <RefreshCw className="w-12 h-12 text-primary animate-spin" />
+                                <div className="absolute inset-0 bg-primary/20 blur-2xl animate-pulse" />
+                              </div>
+                              <div className="flex flex-col items-center gap-2">
+                                <span className="text-[10px] font-mono text-neutral-500 uppercase tracking-widest">Correlating modern vectors...</span>
+                                <div className="flex gap-1">
+                                  {[...Array(3)].map((_, i) => (
+                                    <motion.div 
+                                      key={i}
+                                      animate={{ opacity: [0.2, 1, 0.2] }}
+                                      transition={{ duration: 1, repeat: Infinity, delay: i * 0.2 }}
+                                      className="w-1.5 h-1.5 bg-primary rounded-full" 
+                                    />
+                                  ))}
+                                </div>
+                              </div>
+                            </div>
+                          ) : (
+                            <div className="font-mono text-xs leading-relaxed text-neutral-400 whitespace-pre-wrap bg-neutral-950/50 p-8 rounded-2xl border border-neutral-900 shadow-inner">
+                              {researchReport}
+                            </div>
+                          )}
                         </div>
                       )}
+                    </>
+                  ) : activeResearchSubTab === 'apt' ? (
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 animate-in fade-in duration-500">
+                      {APT_GROUPS.map((group) => (
+                        <div key={group.id} className="p-6 bg-neutral-950 rounded-2xl border border-neutral-900 space-y-4 hover:border-primary/20 transition-all group">
+                          <div className="flex justify-between items-start">
+                            <div className="flex items-center gap-3">
+                              <div className="p-2 bg-neutral-900 rounded-lg group-hover:bg-primary/10 transition-colors">
+                                <Globe size={16} className="text-primary/60" />
+                              </div>
+                              <h4 className="font-bold text-neutral-200">{group.name}</h4>
+                            </div>
+                            <span className="text-[9px] font-mono text-neutral-600 bg-neutral-900 px-2 py-0.5 rounded uppercase">{group.origin}</span>
+                          </div>
+                          <div className="space-y-2">
+                            <div className="text-[10px] font-mono text-neutral-500 uppercase">Primary Focus</div>
+                            <div className="text-[11px] text-neutral-400">{group.focus}</div>
+                          </div>
+                          <div className="flex flex-wrap gap-2 pt-2">
+                            {group.tactics.map((t) => (
+                              <span key={t} className="text-[8px] font-mono px-2 py-0.5 bg-neutral-900 border border-neutral-800 rounded text-neutral-500">{t}</span>
+                            ))}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="space-y-6 animate-in fade-in duration-500">
+                      <div className="grid grid-cols-4 gap-2">
+                        {['Reconnaissance', 'Weaponization', 'Delivery', 'Exploitation'].map(stage => (
+                          <div key={stage} className="p-3 bg-neutral-900/50 rounded-xl border border-neutral-900">
+                            <div className="text-[9px] font-mono text-primary mb-3 uppercase tracking-widest">{stage}</div>
+                            <div className="space-y-1.5">
+                              {[...Array(4)].map((_, i) => (
+                                <div key={i} className="p-2 bg-neutral-950 rounded border border-neutral-900 text-[8px] font-mono text-neutral-600 hover:text-primary hover:border-primary/20 cursor-help transition-all">
+                                  T158{i}.00{i+1}
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                      <div className="p-6 bg-primary/5 rounded-2xl border border-primary/10 flex items-center justify-between">
+                        <div className="flex items-center gap-4">
+                          <Shield className="w-8 h-8 text-primary/40" />
+                          <div>
+                            <div className="text-xs font-bold text-neutral-200">MITRE Navigator Export</div>
+                            <div className="text-[10px] text-neutral-500 font-mono">Download JSON layer for Enterprise ATT&CK Matrix</div>
+                          </div>
+                        </div>
+                        <button className="px-4 py-2 bg-neutral-900 text-[10px] font-mono border border-neutral-800 rounded-lg hover:text-primary transition-colors">EXPORT_LAYER</button>
+                      </div>
                     </div>
                   )}
 
@@ -1154,6 +1296,113 @@ export default function TerpDashboard() {
                   </motion.section>
                 )}
               </AnimatePresence>
+            </div>
+          </div>
+        ) : activeTab === 'payloads' ? (
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
+            <div className="lg:col-span-4 space-y-6">
+              <section className="terminal-card rounded-2xl p-6 space-y-6">
+                <h2 className="text-xl font-display font-bold flex items-center gap-2">
+                  <Zap className="w-6 h-6 text-primary" /> LEETSEEK_ENGINE
+                </h2>
+                <div className="space-y-4">
+                  <div className="bg-neutral-950 p-4 rounded-xl border border-neutral-900">
+                    <label className="text-[10px] font-mono text-neutral-500 uppercase block mb-3">Obfuscation Level</label>
+                    <input 
+                      type="range" 
+                      min="1" 
+                      max="10" 
+                      value={obfuscationLevel}
+                      onChange={(e) => setObfuscationLevel(parseInt(e.target.value))}
+                      className="w-full h-1.5 bg-neutral-900 rounded-full appearance-none cursor-pointer accent-primary"
+                    />
+                    <div className="flex justify-between mt-2 text-[9px] font-mono text-neutral-600 uppercase">
+                      <span>Low</span>
+                      <span className="text-primary font-bold">LVL_{obfuscationLevel}</span>
+                      <span>NextGen</span>
+                    </div>
+                  </div>
+                  
+                  <div className="bg-neutral-950 p-4 rounded-xl border border-neutral-900">
+                    <label className="text-[10px] font-mono text-neutral-500 uppercase block mb-3">Target OS</label>
+                    <div className="grid grid-cols-3 gap-2">
+                      {['Windows', 'Linux', 'macOS'].map(os => (
+                        <button key={os} className="py-2 bg-neutral-900 rounded-lg text-[9px] font-mono text-neutral-400 hover:text-white border border-neutral-800 hover:border-primary/20">{os}</button>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              </section>
+
+              <section className="terminal-card rounded-2xl p-6 bg-primary/5 border border-primary/20">
+                <div className="flex items-center gap-4 mb-4">
+                  <div className="p-2 bg-primary rounded-lg text-white">
+                    <Shield className="w-5 h-5" />
+                  </div>
+                  <div>
+                    <h3 className="text-xs font-bold text-neutral-200">Polymorphic Engine</h3>
+                    <p className="text-[9px] text-neutral-500 font-mono">Real-time signature mutation</p>
+                  </div>
+                </div>
+                <button 
+                  onClick={() => setIsGeneratingPayload(true)}
+                  className="w-full py-3 bg-primary text-white rounded-xl font-mono text-xs font-bold hover:scale-[1.02] transition-all flex items-center justify-center gap-2 shadow-lg shadow-primary/20"
+                >
+                  <RefreshCw className={cn("w-4 h-4", isGeneratingPayload && "animate-spin")} />
+                  {isGeneratingPayload ? 'GENERATING_MUTATIONS...' : 'BUILD_STAGER_X'}
+                </button>
+              </section>
+            </div>
+
+            <div className="lg:col-span-8 space-y-6">
+              <section className="terminal-card rounded-2xl overflow-hidden shadow-2xl flex flex-col h-full">
+                <div className="p-6 border-b border-neutral-900 bg-neutral-900/20 flex justify-between items-center">
+                  <div className="flex items-center gap-3">
+                    <Cpu size={18} className="text-primary" />
+                    <span className="font-mono text-xs text-neutral-400">PAYLOAD_CONSTRUCT::v9.2</span>
+                  </div>
+                </div>
+                <div className="flex-1 p-8 font-mono text-xs leading-relaxed text-neutral-400 overflow-auto custom-scrollbar bg-neutral-950/30">
+                  {isGeneratingPayload ? (
+                    <div className="space-y-2 animate-pulse">
+                      {[...Array(12)].map((_, i) => (
+                        <div key={i} className="flex gap-4">
+                          <span className="text-neutral-700">0x{Math.floor(i * 123456).toString(16).padStart(6, '0')}</span>
+                          <span className="text-primary/40">MOV EAX, {(i * 555).toString(16)}</span>
+                          <span className="text-neutral-800">; Mutating signature block {i}...</span>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                      {SIMULATED_STAGERS.map(stager => (
+                        <div key={stager.id} className="p-5 bg-neutral-900 rounded-2xl border border-neutral-800 hover:border-primary/30 transition-all group">
+                          <div className="flex justify-between items-start mb-4">
+                            <div className="flex items-center gap-3">
+                              <div className="p-2 bg-neutral-950 rounded-lg group-hover:bg-primary/10 transition-colors">
+                                <Zap size={14} className="text-primary/60" />
+                              </div>
+                              <h4 className="font-bold text-neutral-200">{stager.name}</h4>
+                            </div>
+                            <span className="text-[8px] font-mono text-primary px-2 py-0.5 bg-primary/10 rounded uppercase">{stager.obfuscation}</span>
+                          </div>
+                          <div className="grid grid-cols-2 gap-4 text-[9px] font-mono text-neutral-500 uppercase mb-4">
+                            <div>
+                              <div className="text-[7px] text-neutral-700 mb-1">TYPE</div>
+                              <div className="text-neutral-400">{stager.type}</div>
+                            </div>
+                            <div>
+                              <div className="text-[7px] text-neutral-700 mb-1">STATUS</div>
+                              <div className="text-green-500/60">{stager.status}</div>
+                            </div>
+                          </div>
+                          <button className="w-full py-2 bg-neutral-950 border border-neutral-800 rounded-lg text-[9px] font-mono hover:text-primary transition-colors">VIEW_BLUEPRINT</button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </section>
             </div>
           </div>
         ) : (

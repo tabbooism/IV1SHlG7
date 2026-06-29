@@ -9,7 +9,6 @@ export const INDUSTRY_TEMPLATES = [
   { id: 'legal-firm', name: 'Law Firm', category: 'Professional', useCase: 'Document signature urgency' },
   { id: 'cloud-provider', name: 'Cloud Provider', category: 'Enterprise', useCase: 'Quota limit / security breach' },
   { id: 'retail-cust', name: 'Retail Customer Service', category: 'Consumer', useCase: 'Order cancellation' },
-  // ... scaled to 50+ in production
 ];
 
 export const ADVANCED_PERSONAS = [
@@ -50,6 +49,13 @@ export const ADVANCED_PERSONAS = [
   }
 ];
 
+export const APT_GROUPS = [
+  { id: 'apt29', name: 'APT29 (Cozy Bear)', origin: 'Russia', focus: 'Government, Diplomatic', tactics: ['Vishing', 'Cloud Exploits'] },
+  { id: 'apt28', name: 'APT28 (Fancy Bear)', origin: 'Russia', focus: 'Defense, Media', tactics: ['Spearphishing', 'OAuth Abuse'] },
+  { id: 'lazarus', name: 'Lazarus Group', origin: 'North Korea', focus: 'Finance, Crypto', tactics: ['Social Engineering', 'Supply Chain'] },
+  { id: 'fin7', name: 'FIN7', origin: 'Unknown', focus: 'Retail, Hospitality', tactics: ['Smishing', 'PoS Malware'] },
+];
+
 export const SENSITIVE_AGENTS = [
   { id: 'neg-1', name: 'Crisis Negotiator', field: 'Emergency Services', focus: 'De-escalation', clearance: 'Level 4' },
   { id: 'int-1', name: 'Intel Liaison', field: 'Defense', focus: 'Inter-agency comms', clearance: 'Level 5' },
@@ -70,7 +76,15 @@ export const OSINT_TRENDS = [
 ];
 
 export const SIMULATED_STAGERS = [
-  { id: 'st-1', name: 'LEETSEEK_CORE_v1', type: 'Initial Access', status: 'Gated' },
-  { id: 'st-2', name: 'POLY_LOADER_ALPHA', type: 'Persistence', status: 'Gated' },
-  { id: 'st-3', name: 'STAGED_DROpper_X', type: 'Payload Delivery', status: 'Gated' },
+  { id: 'st-1', name: 'LEETSEEK_CORE_v1', type: 'Initial Access', status: 'Gated', obfuscation: 'Polymorphic' },
+  { id: 'st-2', name: 'POLY_LOADER_ALPHA', type: 'Persistence', status: 'Gated', obfuscation: 'Metamorphic' },
+  { id: 'st-3', name: 'STAGED_DROpper_X', type: 'Payload Delivery', status: 'Gated', obfuscation: 'Encrypted' },
+  { id: 'st-4', name: 'GHOST_RUNNER', type: 'Execution', status: 'In_Dev', obfuscation: 'Multi-layer' },
 ];
+
+export const RCS_TEMPLATES = [
+  { id: 'rcs-1', brand: 'Google Support', logo: 'https://www.gstatic.com/images/branding/product/2x/googleg_96dp.png', message: 'Your account security code is: 981273. If you did not request this, click here to secure.' },
+  { id: 'rcs-2', brand: 'Amazon', logo: 'https://upload.wikimedia.org/wikipedia/commons/a/a9/Amazon_logo.svg', message: 'Package #AZ-9912 is arriving today. Confirm delivery preferences below.' },
+  { id: 'rcs-3', brand: 'Apple', logo: 'https://upload.wikimedia.org/wikipedia/commons/f/fa/Apple_logo_black.svg', message: 'A new device has logged into your iCloud from Moscow, RU. Not you? Review activity.' },
+];
+
